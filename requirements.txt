@@ -1,0 +1,5 @@
+asgiref==3.11.1
+Django==5.2.14
+packaging==26.0
+ruff==0.15.14
+sqlparse==0.5.5

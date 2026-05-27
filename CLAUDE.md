@@ -71,12 +71,13 @@ Read these before proposing anything. They decide trade-offs.
 
 Fill the bracketed values in once, then leave them.
 
-- Python version: [e.g. 3.11]
-- Dependency manager: [e.g. uv / pip + venv / poetry]
-- Run the app: [e.g. docker compose up]
-- Run tests: [e.g. python manage.py test]
-- Run migrations: [e.g. python manage.py migrate]
-- Lint / format: [e.g. ruff check . && ruff format .]
+- Python version: 3.11 (via micromamba env `primeserve`)
+- Dependency manager: pip inside micromamba env `primeserve`
+- Activate env: micromamba activate primeserve
+- Run the app: docker compose up (when compose file exists)
+- Run tests: python manage.py test
+- Run migrations: python manage.py migrate
+- Lint / format: ruff check . && ruff format .
 - Django check: python manage.py check
 
 ## How to work in this repo
