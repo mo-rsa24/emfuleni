@@ -1,0 +1,38 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Django ---
+*.log
+db.sqlite3
+db.sqlite3-journal
+/media/
+/staticfiles/
+
+# --- Secrets / environment ---
+.env
+.env.*
+!.env.example
+*.pem
+
+# --- Docker ---
+# (compose files ARE committed; only local overrides are ignored)
+docker-compose.override.yml
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# --- Claude Code ---
+# .claude/ IS committed — it is the shared project config.
+# Only ignore local, machine-specific Claude state:
+.claude/settings.local.json
