@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 
-from portal import services as portal_services
+from portal import worker_services as portal_worker
 
 
 logger = logging.getLogger(__name__)
@@ -21,13 +21,14 @@ logger = logging.getLogger(__name__)
 def run_extraction(evidence_id: int) -> dict:
     """Run VLM extraction on one Evidence row. Runs inside an RQ worker.
 
-    Looks the Evidence up via `portal.services.get_evidence_by_pk` so we
-    do not import portal.models from this app. Returns a small dict so
-    the RQ job result is human-readable.
+    Looks the Evidence up via `portal.worker_services.get_evidence_by_pk`
+    (the deliberately tenant-agnostic worker lookup — see that module's
+    docstring). The tenant comes back on the Evidence row itself.
+    Returns a small dict so the RQ job result is human-readable.
     """
     from . import services  # local import to dodge circular-load at startup
 
-    evidence = portal_services.get_evidence_by_pk(evidence_id)
+    evidence = portal_worker.get_evidence_by_pk(evidence_id)
     if evidence is None:
         logger.warning("run_extraction: evidence %s not found", evidence_id)
         return {"status": "skipped", "reason": "evidence_not_found"}

@@ -16,6 +16,7 @@ from django.conf import settings
 from django.core.files.uploadedfile import UploadedFile
 
 from common.models import Municipality
+from vlm import services as vlm_services
 
 from .models import Evidence
 
@@ -69,33 +70,9 @@ def record_evidence(
     # Slice 6 auto-trigger: every photo enqueues a VLM extraction. CSV and
     # PDF kinds skip this — Slice 7 will parse those when the engine needs them.
     if kind == Evidence.KIND_PHOTO:
-        from vlm import services as vlm_services
-
         vlm_services.enqueue_extraction(evidence)
 
     return evidence
-
-
-def get_evidence_by_pk(pk) -> Evidence | None:
-    """Tenant-agnostic Evidence lookup by pk for in-process workers.
-
-    **WORKER-ONLY.** This is the only deliberately tenant-agnostic read
-    service in the project. Use it ONLY from background jobs that already
-    have a trusted pk and no caller-supplied tenant (e.g.
-    `vlm.tasks.run_extraction`). The returned Evidence carries
-    `municipality` itself, so downstream queries can scope from there.
-
-    DO NOT call this from view code or any code reachable from an HTTP
-    request — use `get_evidence(municipality, pk)` (tenant-scoped) instead.
-    Returns None on bad pk shape.
-    """
-    if pk in (None, ""):
-        return None
-    try:
-        pk_int = int(pk)
-    except (TypeError, ValueError):
-        return None
-    return Evidence.objects.filter(pk=pk_int).first()
 
 
 def get_evidence(municipality: Municipality, pk) -> Evidence | None:

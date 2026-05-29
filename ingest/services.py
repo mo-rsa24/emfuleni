@@ -70,6 +70,23 @@ def get_latest_bill(account: MunicipalAccount) -> MunicipalBill | None:
     )
 
 
+def latest_meter_reading_before(account: MunicipalAccount, period):
+    """Most recent municipal `MeterReading` strictly before `period.year-month`.
+
+    Used by the engine's estimate_cap_breach archetype as the baseline
+    against which a current photo reading is compared to compute
+    consumption. Tenant-scoped through the account.
+    """
+    from .models import MeterReading
+
+    return (
+        MeterReading.objects.for_tenant(account.municipality)
+        .filter(municipal_account=account, reading_date__lt=period)
+        .order_by("-reading_date")
+        .first()
+    )
+
+
 def enqueue_poll(municipality: Municipality):
     """Enqueue a poll of the tenant's SFTP inbox.
 
