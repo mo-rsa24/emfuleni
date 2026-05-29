@@ -36,3 +36,7 @@ Thumbs.db
 # .claude/ IS committed — it is the shared project config.
 # Only ignore local, machine-specific Claude state:
 .claude/settings.local.json
+
+.venv/
+venv/
+env/

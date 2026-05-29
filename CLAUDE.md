@@ -8,7 +8,7 @@ when VS Code is opened on this folder. Keep it under ~200 lines.
 A ratepayer-facing layer on top of the Reconciliation v0 demo. A ratepayer
 can challenge a municipal bill with evidence, pay what they actually owe,
 and the municipality receives a clean correction message to action on their
-side. Launch tenant: Emfuleni. See `emfuleni/plans/MVP_DESIGN_NOTE.md` for
+side. Launch tenant: Emfuleni. See `plans/MVP_DESIGN_NOTE.md` for
 the full design note — that note is the source of truth for product scope.
 
 ## What we are optimizing for
