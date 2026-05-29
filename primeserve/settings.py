@@ -135,6 +135,36 @@ DEFAULT_TENANT_SLUG = 'emfuleni'
 PORTAL_SESSION_KEY = 'portal:ratepayer_id'
 
 
+# Media — ratepayer-uploaded evidence (Slice 5)
+# Layout: MEDIA_ROOT/<tenant_slug>/evidence/<uuid>.<ext>. Swap to S3 in
+# af-south-1 (Q8) is a config-only change via DEFAULT_FILE_STORAGE.
+
+MEDIA_ROOT = BASE_DIR / 'dev_media'
+MEDIA_URL = '/media/'
+
+
+# Per-evidence-kind validation. Sizes are bytes; allowed_exts is the
+# whitelist of file extensions (lowercase, no dot). Tightening these is
+# easier than loosening them later — start conservative.
+
+EVIDENCE_MAX_BYTES = 10 * 1024 * 1024  # 10 MiB
+
+EVIDENCE_KIND_RULES = {
+    'photo': {
+        'allowed_exts': ('jpg', 'jpeg', 'png', 'heic', 'webp'),
+        'allowed_mimes': ('image/jpeg', 'image/png', 'image/heic', 'image/webp'),
+    },
+    'csv': {
+        'allowed_exts': ('csv',),
+        'allowed_mimes': ('text/csv', 'application/vnd.ms-excel', 'text/plain'),
+    },
+    'statement_pdf': {
+        'allowed_exts': ('pdf',),
+        'allowed_mimes': ('application/pdf',),
+    },
+}
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 

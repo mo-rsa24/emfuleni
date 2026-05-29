@@ -15,7 +15,12 @@ urlpatterns = [
     path("account/<int:account_id>/", views.account_detail, name="account_detail"),
     path(
         "account/<int:account_id>/challenge/",
-        views.challenge_stub,
-        name="challenge_stub",
+        views.challenge_panel,
+        name="challenge_panel",
+    ),
+    path(
+        "account/<int:account_id>/evidence/upload/",
+        views.evidence_upload,
+        name="evidence_upload",
     ),
 ]

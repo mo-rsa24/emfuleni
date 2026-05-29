@@ -1,6 +1,7 @@
 """Portal views — the web channel surface for the ratepayer.
 
-Implements design note §2.2: lookup account → verify OTP → see current bill.
+Implements design note §2.2 (lookup + bill display) and §2.3 (evidence
+upload).
 
 All cross-app data access goes through `identity.services` or
 `ingest.services`. The portal app does NOT import models from any other
@@ -18,6 +19,8 @@ from common.services import get_current_tenant
 from identity import services as identity_services
 from ingest import services as ingest_services
 
+from . import services as portal_services
+from .services import EvidenceValidationError
 from .session import (
     clear_logged_in_ratepayer,
     get_logged_in_ratepayer,
@@ -148,10 +151,81 @@ def account_detail(request: HttpRequest, account_id: int) -> HttpResponse:
 
 
 @require_POST
-def challenge_stub(request: HttpRequest, account_id: int) -> HttpResponse:
-    """HTMX partial response — Slice 5 replaces this with the evidence flow."""
+def challenge_panel(request: HttpRequest, account_id: int) -> HttpResponse:
+    """HTMX partial: opens the evidence upload form for this account."""
+    account, _ = _resolve_account_for_request(request, account_id)
+    if account is None:
+        return HttpResponse(status=401)
+    return render(
+        request,
+        "portal/partials/upload_form.html",
+        {"account": account, "evidence_list": portal_services.list_evidence_for_account(account)},
+    )
+
+
+@require_POST
+def evidence_upload(request: HttpRequest, account_id: int) -> HttpResponse:
+    """HTMX partial: accept a file, validate, persist, re-render the panel."""
+    account, ratepayer = _resolve_account_for_request(request, account_id)
+    if account is None:
+        return HttpResponse(status=401)
+
+    kind = request.POST.get("kind", "").strip()
+    uploaded = request.FILES.get("file")
+    if uploaded is None:
+        return render(
+            request,
+            "portal/partials/upload_form.html",
+            {
+                "account": account,
+                "evidence_list": portal_services.list_evidence_for_account(account),
+                "error": "Choose a file before uploading.",
+                "selected_kind": kind,
+            },
+        )
+
+    try:
+        portal_services.record_evidence(
+            ratepayer=ratepayer,
+            account=account,
+            kind=kind,
+            uploaded_file=uploaded,
+        )
+    except EvidenceValidationError as exc:
+        return render(
+            request,
+            "portal/partials/upload_form.html",
+            {
+                "account": account,
+                "evidence_list": portal_services.list_evidence_for_account(account),
+                "error": str(exc),
+                "selected_kind": kind,
+            },
+        )
+
+    return render(
+        request,
+        "portal/partials/upload_form.html",
+        {
+            "account": account,
+            "evidence_list": portal_services.list_evidence_for_account(account),
+            "success": "Uploaded — saved against this account.",
+        },
+    )
+
+
+def _resolve_account_for_request(request: HttpRequest, account_id: int):
+    """Common pre-check for the account-scoped HTMX endpoints.
+
+    Returns (account, ratepayer) on success; (None, None) when the caller
+    isn't logged in or isn't linked to the account. Callers convert the
+    None case into HttpResponse(status=401).
+    """
     tenant = get_current_tenant(request)
     ratepayer = get_logged_in_ratepayer(request, tenant)
     if ratepayer is None:
-        return HttpResponse(status=401)
-    return render(request, "portal/partials/challenge_acknowledged.html")
+        return None, None
+    account = ingest_services.get_account_by_pk(tenant, account_id)
+    if account is None or not identity_services.is_account_linked(ratepayer, account):
+        return None, None
+    return account, ratepayer

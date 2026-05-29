@@ -31,6 +31,10 @@ docker-compose.override.yml
 # sample lives in ingest/fixtures/ instead.
 /dev_inbox/
 
+# --- Dev media (Slice 5 evidence uploads) ---
+# Uploaded ratepayer evidence is user data, not source.
+/dev_media/
+
 # --- OS / editor ---
 .DS_Store
 Thumbs.db

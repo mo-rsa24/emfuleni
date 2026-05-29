@@ -1,0 +1,49 @@
+<section class="stack" id="challenge-panel">
+  <h3 style="margin: 0;">Add evidence</h3>
+  <p style="margin: 0; color: var(--muted);">Upload a meter photo, a CSV of your own readings, or the municipal statement you received.</p>
+
+  <form hx-post="{% url 'portal:evidence_upload' account.id %}"
+        hx-target="#challenge-region"
+        hx-swap="innerHTML"
+        hx-encoding="multipart/form-data"
+        hx-indicator="#upload-indicator"
+        class="stack">
+    {% csrf_token %}
+
+    <div>
+      <label for="evidence-kind">Kind</label>
+      <select id="evidence-kind" name="kind" required>
+        <option value="photo" {% if selected_kind == "photo" or not selected_kind %}selected{% endif %}>Meter photograph</option>
+        <option value="csv" {% if selected_kind == "csv" %}selected{% endif %}>Spreadsheet of readings (CSV)</option>
+        <option value="statement_pdf" {% if selected_kind == "statement_pdf" %}selected{% endif %}>Municipal statement (PDF)</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="evidence-file">File</label>
+      <input type="file" id="evidence-file" name="file" required>
+    </div>
+
+    {% if error %}<p class="err">{{ error }}</p>{% endif %}
+    {% if success %}<p style="color: green;">{{ success }}</p>{% endif %}
+
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <button type="submit">Upload</button>
+      <span id="upload-indicator" class="htmx-indicator" style="color: var(--muted); font-size: 0.875rem;">Uploading…</span>
+    </div>
+  </form>
+
+  {% if evidence_list %}
+    <div>
+      <h4 style="margin: 0.5rem 0;">On file for this account</h4>
+      <ul style="margin: 0; padding-left: 1.25rem;">
+        {% for ev in evidence_list %}
+          <li>
+            <strong>{{ ev.get_kind_display }}</strong> ·
+            <span style="color: var(--muted);">{{ ev.original_filename }} ({{ ev.size_bytes }} bytes) · {{ ev.created_at|date:"Y-m-d H:i" }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+</section>

@@ -1,14 +1,17 @@
-"""Tests for portal views (Slice 4)."""
+"""Tests for portal views (Slice 4 + Slice 5 evidence upload)."""
 
+import tempfile
 from datetime import date
 
 from django.conf import settings
-from django.test import Client, TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from common.models import Municipality
 from identity.models import OtpCode, Ratepayer, RatepayerAccountLink
 from ingest.models import Extract, MunicipalAccount, MunicipalBill
+from portal.models import Evidence
 
 
 def _make_extract(municipality, *, content_hash):
@@ -292,25 +295,150 @@ class AccountDetailViewTests(TestCase):
         self.assertEqual(response["Location"], "/")
 
 
-class ChallengeStubTests(TestCase):
+class ChallengePanelTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.fixture = _make_ratepayer_with_account()
         self.ratepayer = self.fixture["ratepayer"]
         self.account = self.fixture["account"]
 
-    def test_post_when_logged_in_returns_partial(self):
+    def test_post_when_logged_in_returns_upload_form(self):
         _login(self.client, self.ratepayer)
 
         response = self.client.post(f"/account/{self.account.pk}/challenge/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Slice 5")
+        # Renders the upload partial with the file input.
+        self.assertContains(response, 'name="file"')
+        self.assertContains(response, 'name="kind"')
 
     def test_post_when_not_logged_in_returns_401(self):
         response = self.client.post(f"/account/{self.account.pk}/challenge/")
 
         self.assertEqual(response.status_code, 401)
+
+
+def _png_bytes(n: int = 32) -> bytes:
+    return b"\x89PNG\r\n\x1a\n" + (b"\x00" * n)
+
+
+class EvidenceUploadViewTests(TestCase):
+    def setUp(self):
+        self._media_tmp = tempfile.TemporaryDirectory()
+        self._override = override_settings(MEDIA_ROOT=self._media_tmp.name)
+        self._override.enable()
+        self.client = Client()
+        self.fixture = _make_ratepayer_with_account()
+        self.tenant = self.fixture["municipality"]
+        self.ratepayer = self.fixture["ratepayer"]
+        self.account = self.fixture["account"]
+
+    def tearDown(self):
+        self._override.disable()
+        self._media_tmp.cleanup()
+
+    def _upload_url(self, account_id):
+        return f"/account/{account_id}/evidence/upload/"
+
+    def test_post_with_valid_photo_persists_row_and_renders_success(self):
+        _login(self.client, self.ratepayer)
+        file = SimpleUploadedFile(
+            "meter.png", _png_bytes(), content_type="image/png"
+        )
+
+        response = self.client.post(
+            self._upload_url(self.account.pk),
+            {"kind": "photo", "file": file},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Uploaded")
+        self.assertEqual(Evidence.objects.count(), 1)
+        evidence = Evidence.objects.first()
+        self.assertEqual(evidence.kind, "photo")
+        self.assertEqual(evidence.municipality_id, self.tenant.pk)
+
+    def test_post_with_invalid_extension_does_not_persist_and_shows_error(self):
+        _login(self.client, self.ratepayer)
+        file = SimpleUploadedFile(
+            "evil.exe", b"MZ\x90\x00malware", content_type="image/png"
+        )
+
+        response = self.client.post(
+            self._upload_url(self.account.pk),
+            {"kind": "photo", "file": file},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "accepted for this kind")
+        self.assertEqual(Evidence.objects.count(), 0)
+
+    def test_post_with_no_file_shows_error(self):
+        _login(self.client, self.ratepayer)
+
+        response = self.client.post(
+            self._upload_url(self.account.pk),
+            {"kind": "photo"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Choose a file")
+        self.assertEqual(Evidence.objects.count(), 0)
+
+    def test_post_when_not_logged_in_returns_401(self):
+        file = SimpleUploadedFile(
+            "meter.png", _png_bytes(), content_type="image/png"
+        )
+
+        response = self.client.post(
+            self._upload_url(self.account.pk),
+            {"kind": "photo", "file": file},
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(Evidence.objects.count(), 0)
+
+    def test_post_when_logged_in_but_not_linked_to_account_returns_401(self):
+        # Ratepayer B exists in the same tenant but is not linked to
+        # ratepayer A's account.
+        ratepayer_b = _make_ratepayer(
+            self.tenant, full_name="Other Person", msisdn="+27820000099"
+        )
+        _login(self.client, ratepayer_b)
+        file = SimpleUploadedFile(
+            "meter.png", _png_bytes(), content_type="image/png"
+        )
+
+        response = self.client.post(
+            self._upload_url(self.account.pk),
+            {"kind": "photo", "file": file},
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(Evidence.objects.count(), 0)
+
+    def test_post_when_account_belongs_to_other_tenant_returns_401(self):
+        other = _make_ratepayer_with_account(
+            slug="sedibeng",
+            name="Sedibeng",
+            account_number="55512345",
+            full_name="Sedibeng Person",
+            msisdn="+27820000088",
+        )
+
+        # Log in as the Emfuleni ratepayer; POST to the Sedibeng account.
+        _login(self.client, self.ratepayer)
+        file = SimpleUploadedFile(
+            "meter.png", _png_bytes(), content_type="image/png"
+        )
+
+        response = self.client.post(
+            self._upload_url(other["account"].pk),
+            {"kind": "photo", "file": file},
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(Evidence.objects.count(), 0)
 
 
 class LogoutTests(TestCase):
