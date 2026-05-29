@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import tempfile
+import types
+from unittest.mock import MagicMock, patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -18,6 +20,7 @@ from portal.services import (
     list_evidence_for_account,
     record_evidence,
 )
+from vlm.models import VlmExtraction
 
 
 def _make_extract(municipality, *, content_hash):
@@ -395,3 +398,93 @@ class ListEvidenceForAccountTests(_TempMediaTestCase):
 
         result = list_evidence_for_account(self.account)
         self.assertEqual(result, [ev_a])
+
+
+# --- Slice 6: VLM auto-trigger ---------------------------------------------
+
+
+def _fake_vlm_response(text: str):
+    return types.SimpleNamespace(
+        content=[types.SimpleNamespace(type="text", text=text)]
+    )
+
+
+def _fake_vlm_client(text: str):
+    client = MagicMock()
+    client.messages.create.return_value = _fake_vlm_response(text)
+    return client
+
+
+class RecordEvidenceAutoTriggerTests(_TempMediaTestCase):
+    """`record_evidence(kind='photo')` should auto-enqueue VLM extraction.
+
+    RQ runs sync in tests (settings.RQ_QUEUES.default.ASYNC=False), so the
+    extraction completes inline. We monkey-patch the provider client so the
+    real Anthropic SDK never gets called.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.fixture = _make_ratepayer_with_account()
+        self.tenant = self.fixture["municipality"]
+        self.ratepayer = self.fixture["ratepayer"]
+        self.account = self.fixture["account"]
+
+    def test_photo_upload_triggers_vlm_extraction(self):
+        fake = _fake_vlm_client(
+            '{"reading_kl": 4127, "confidence": 0.94, "notes": "ok"}'
+        )
+
+        with patch("vlm.services._default_client", return_value=fake):
+            evidence = record_evidence(
+                ratepayer=self.ratepayer,
+                account=self.account,
+                kind="photo",
+                uploaded_file=SimpleUploadedFile(
+                    "meter.png", _png_bytes(64), content_type="image/png"
+                ),
+            )
+
+        row = VlmExtraction.objects.get(evidence=evidence)
+        self.assertEqual(row.status, VlmExtraction.STATUS_EXTRACTED)
+        self.assertEqual(row.reading_kl, 4127)
+
+    def test_csv_upload_does_not_trigger_vlm(self):
+        sentinel = MagicMock()
+
+        with patch("vlm.services._default_client", sentinel):
+            evidence = record_evidence(
+                ratepayer=self.ratepayer,
+                account=self.account,
+                kind="csv",
+                uploaded_file=SimpleUploadedFile(
+                    "readings.csv",
+                    b"date,reading\n2026-01-01,123\n",
+                    content_type="text/csv",
+                ),
+            )
+
+        self.assertFalse(
+            VlmExtraction.objects.filter(evidence=evidence).exists()
+        )
+        self.assertFalse(sentinel.called)
+
+    def test_pdf_upload_does_not_trigger_vlm(self):
+        sentinel = MagicMock()
+
+        with patch("vlm.services._default_client", sentinel):
+            evidence = record_evidence(
+                ratepayer=self.ratepayer,
+                account=self.account,
+                kind="statement_pdf",
+                uploaded_file=SimpleUploadedFile(
+                    "statement.pdf",
+                    b"%PDF-1.4\n%fake\n",
+                    content_type="application/pdf",
+                ),
+            )
+
+        self.assertFalse(
+            VlmExtraction.objects.filter(evidence=evidence).exists()
+        )
+        self.assertFalse(sentinel.called)

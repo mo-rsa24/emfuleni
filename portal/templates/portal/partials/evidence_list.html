@@ -1,0 +1,64 @@
+{% comment %}
+Evidence list — polled while any photo extraction is still `pending`.
+When `any_pending` is false the wrapping div omits the hx-trigger,
+so HTMX stops polling on the next swap.
+{% endcomment %}
+{% if evidence_list %}
+<div id="evidence-list-region"
+     {% if any_pending %}
+       hx-get="{% url 'portal:evidence_list_panel' account.id %}"
+       hx-trigger="every 2s"
+       hx-swap="outerHTML"
+     {% endif %}>
+  <h4 style="margin: 0.5rem 0;">On file for this account</h4>
+  <ul class="evidence-list">
+    {% for ev in evidence_list %}
+      <li>
+        {% if ev.kind == "photo" %}
+          <img class="evidence-thumb" src="{{ ev.file.url }}" alt="Uploaded photo {{ ev.original_filename }}">
+        {% else %}
+          <div class="evidence-thumb-placeholder">{% if ev.kind == "csv" %}CSV{% else %}PDF{% endif %}</div>
+        {% endif %}
+
+        <div class="evidence-meta">
+          <div class="row1">
+            <strong>{{ ev.get_kind_display }}</strong>
+            {% with extr=ev.vlm_extraction %}
+              {% if extr %}
+                {% if extr.status == "extracted" %}
+                  <span class="badge badge-success">Extracted</span>
+                {% elif extr.status == "low_confidence" %}
+                  <span class="badge badge-warn">Low confidence</span>
+                {% elif extr.status == "failed" %}
+                  <span class="badge badge-error">Failed</span>
+                {% else %}
+                  <span class="badge badge-muted">Reading&hellip;</span>
+                {% endif %}
+              {% endif %}
+            {% endwith %}
+          </div>
+          <div class="row2">
+            {{ ev.original_filename }} &middot; {{ ev.size_bytes }} bytes &middot; {{ ev.created_at|date:"Y-m-d H:i" }}
+          </div>
+          {% with extr=ev.vlm_extraction %}
+            {% if extr and extr.reading_kl is not None %}
+              <div class="row3">
+                Read <strong>{{ extr.reading_kl }} k&ell;</strong>
+                <span class="confbar{% if extr.status == 'low_confidence' %} low{% endif %}" title="confidence {{ extr.confidence|floatformat:2 }}">
+                  <span style="width: {% widthratio extr.confidence 1 100 %}%;"></span>
+                </span>
+                <span style="color: var(--muted); font-size: 0.875rem;">{{ extr.confidence|floatformat:2 }}</span>
+                {% if extr.notes %}<div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.125rem;">{{ extr.notes }}</div>{% endif %}
+              </div>
+            {% elif extr and extr.status == "failed" %}
+              <div class="row3" style="color: var(--warn); font-size: 0.875rem;">Please retake the photo and upload again.</div>
+            {% elif extr and extr.status == "pending" %}
+              <div class="row3" style="color: var(--muted); font-size: 0.875rem;">Reading the dial&hellip;</div>
+            {% endif %}
+          {% endwith %}
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

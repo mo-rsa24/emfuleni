@@ -4,8 +4,10 @@ channels:
 dependencies:
   - python=3.11
   - pip:
+    - anthropic==0.105.2
     - Django==5.2.14
     - django-rq==3.2.2
+    - pydantic==2.13.4
     - rq==2.9.0
     - redis==8.0.0
     - ruff==0.15.14

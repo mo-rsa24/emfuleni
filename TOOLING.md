@@ -522,6 +522,22 @@ Worker (either backend):
 python manage.py rqworker default     # foreground worker, Ctrl+C to stop
 ```
 
+### Anthropic API (Slice 6 onward)
+
+VLM extraction (`vlm.services.extract_meter_reading`) calls Claude Sonnet 4.6
+vision per design-note Q3. Needs an API key:
+
+```bash
+export ANTHROPIC_API_KEY='sk-ant-...'   # in your shell or ~/.bashrc
+```
+
+Without the key set, the VLM job marks the extraction as `failed` and writes
+the reason to its `raw_response` JSONB — the rest of the pipeline still works.
+
+Tests do NOT need a live key — they monkey-patch `anthropic.Anthropic` with a
+stub client. The settings.py default for `ANTHROPIC_API_KEY` is the empty
+string, so tests run without env wiring.
+
 ### Git
 
 - Repo initialized on `main`. `.gitignore` covers Python, Django, Docker,

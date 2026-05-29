@@ -1,4 +1,11 @@
 <section class="stack" id="challenge-panel">
+  {% if bill %}
+    <div class="recap">
+      <div><span class="label">Challenging</span> bill for <strong>{{ bill.period_label }}</strong> on account <strong>{{ account.account_number }}</strong></div>
+      <div style="margin-top: 0.25rem;"><span class="label">Municipality says</span> <span class="amount">R&nbsp;{{ bill.closing_balance }}</span></div>
+    </div>
+  {% endif %}
+
   <h3 style="margin: 0;">Add evidence</h3>
   <p style="margin: 0; color: var(--muted);">Upload a meter photo, a CSV of your own readings, or the municipal statement you received.</p>
 
@@ -33,17 +40,5 @@
     </div>
   </form>
 
-  {% if evidence_list %}
-    <div>
-      <h4 style="margin: 0.5rem 0;">On file for this account</h4>
-      <ul style="margin: 0; padding-left: 1.25rem;">
-        {% for ev in evidence_list %}
-          <li>
-            <strong>{{ ev.get_kind_display }}</strong> ·
-            <span style="color: var(--muted);">{{ ev.original_filename }} ({{ ev.size_bytes }} bytes) · {{ ev.created_at|date:"Y-m-d H:i" }}</span>
-          </li>
-        {% endfor %}
-      </ul>
-    </div>
-  {% endif %}
+  {% include "portal/partials/evidence_list.html" %}
 </section>

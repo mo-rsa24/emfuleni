@@ -312,10 +312,118 @@ class ChallengePanelTests(TestCase):
         self.assertContains(response, 'name="file"')
         self.assertContains(response, 'name="kind"')
 
+    def test_post_includes_bill_recap_when_bill_exists(self):
+        _make_bill(
+            self.fixture["municipality"],
+            account=self.account,
+            period=date(2026, 6, 1),
+            extract=self.fixture["extract"],
+            closing_balance="2940.00",
+        )
+        _login(self.client, self.ratepayer)
+
+        response = self.client.post(f"/account/{self.account.pk}/challenge/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Challenging")
+        self.assertContains(response, "2940.00")
+        self.assertContains(response, self.account.account_number)
+
     def test_post_when_not_logged_in_returns_401(self):
         response = self.client.post(f"/account/{self.account.pk}/challenge/")
 
         self.assertEqual(response.status_code, 401)
+
+
+class EvidenceListPanelTests(TestCase):
+    """The polling endpoint that drives live status updates."""
+
+    def setUp(self):
+        self._media_tmp = tempfile.TemporaryDirectory()
+        self._override = override_settings(MEDIA_ROOT=self._media_tmp.name)
+        self._override.enable()
+        self.client = Client()
+        self.fixture = _make_ratepayer_with_account()
+        self.ratepayer = self.fixture["ratepayer"]
+        self.account = self.fixture["account"]
+
+    def tearDown(self):
+        self._override.disable()
+        self._media_tmp.cleanup()
+
+    def test_get_when_not_logged_in_returns_401(self):
+        response = self.client.get(f"/account/{self.account.pk}/evidence/list/")
+        self.assertEqual(response.status_code, 401)
+
+    def test_get_when_logged_in_but_not_linked_returns_401(self):
+        other = _make_ratepayer_with_account(
+            slug="sedibeng", name="Sedibeng", account_number="55555555"
+        )
+        _login(self.client, other["ratepayer"])
+        response = self.client.get(f"/account/{self.account.pk}/evidence/list/")
+        self.assertEqual(response.status_code, 401)
+
+    def test_get_returns_empty_when_no_evidence(self):
+        _login(self.client, self.ratepayer)
+        response = self.client.get(f"/account/{self.account.pk}/evidence/list/")
+        self.assertEqual(response.status_code, 200)
+        # Empty list template renders nothing — no polling region either.
+        self.assertNotContains(response, "evidence-list-region")
+
+    def test_get_omits_hx_trigger_when_no_pending_extractions(self):
+        # Create an evidence row with a completed extraction.
+        ev = Evidence.objects.create(
+            municipality=self.fixture["municipality"],
+            ratepayer=self.ratepayer,
+            municipal_account=self.account,
+            kind=Evidence.KIND_PHOTO,
+            file=SimpleUploadedFile("done.png", b"PNG", content_type="image/png"),
+            original_filename="done.png",
+            content_type="image/png",
+            size_bytes=3,
+        )
+        from vlm.models import VlmExtraction
+        VlmExtraction.objects.create(
+            municipality=self.fixture["municipality"],
+            evidence=ev,
+            status=VlmExtraction.STATUS_EXTRACTED,
+            reading_kl=4127,
+            confidence=0.94,
+        )
+        _login(self.client, self.ratepayer)
+
+        response = self.client.get(f"/account/{self.account.pk}/evidence/list/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "evidence-list-region")
+        self.assertNotContains(response, "hx-trigger")  # polling has stopped
+        self.assertContains(response, "Extracted")
+        self.assertContains(response, "4127")
+
+    def test_get_includes_hx_trigger_when_any_extraction_is_pending(self):
+        ev = Evidence.objects.create(
+            municipality=self.fixture["municipality"],
+            ratepayer=self.ratepayer,
+            municipal_account=self.account,
+            kind=Evidence.KIND_PHOTO,
+            file=SimpleUploadedFile("wait.png", b"PNG", content_type="image/png"),
+            original_filename="wait.png",
+            content_type="image/png",
+            size_bytes=3,
+        )
+        from vlm.models import VlmExtraction
+        VlmExtraction.objects.create(
+            municipality=self.fixture["municipality"],
+            evidence=ev,
+            status=VlmExtraction.STATUS_PENDING,
+        )
+        _login(self.client, self.ratepayer)
+
+        response = self.client.get(f"/account/{self.account.pk}/evidence/list/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'hx-trigger="every 2s"')
+        self.assertContains(response, "evidence/list/")
 
 
 def _png_bytes(n: int = 32) -> bytes:

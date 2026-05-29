@@ -159,7 +159,7 @@ def challenge_panel(request: HttpRequest, account_id: int) -> HttpResponse:
     return render(
         request,
         "portal/partials/upload_form.html",
-        {"account": account, "evidence_list": portal_services.list_evidence_for_account(account)},
+        _panel_context(account),
     )
 
 
@@ -173,16 +173,9 @@ def evidence_upload(request: HttpRequest, account_id: int) -> HttpResponse:
     kind = request.POST.get("kind", "").strip()
     uploaded = request.FILES.get("file")
     if uploaded is None:
-        return render(
-            request,
-            "portal/partials/upload_form.html",
-            {
-                "account": account,
-                "evidence_list": portal_services.list_evidence_for_account(account),
-                "error": "Choose a file before uploading.",
-                "selected_kind": kind,
-            },
-        )
+        ctx = _panel_context(account)
+        ctx.update(error="Choose a file before uploading.", selected_kind=kind)
+        return render(request, "portal/partials/upload_form.html", ctx)
 
     try:
         portal_services.record_evidence(
@@ -192,26 +185,49 @@ def evidence_upload(request: HttpRequest, account_id: int) -> HttpResponse:
             uploaded_file=uploaded,
         )
     except EvidenceValidationError as exc:
-        return render(
-            request,
-            "portal/partials/upload_form.html",
-            {
-                "account": account,
-                "evidence_list": portal_services.list_evidence_for_account(account),
-                "error": str(exc),
-                "selected_kind": kind,
-            },
-        )
+        ctx = _panel_context(account)
+        ctx.update(error=str(exc), selected_kind=kind)
+        return render(request, "portal/partials/upload_form.html", ctx)
 
+    ctx = _panel_context(account)
+    ctx.update(success="Uploaded — saved against this account.")
+    return render(request, "portal/partials/upload_form.html", ctx)
+
+
+def evidence_list_panel(request: HttpRequest, account_id: int) -> HttpResponse:
+    """HTMX partial: just the evidence list (used for live polling).
+
+    While any photo extraction is still `pending`, the rendered fragment
+    carries `hx-trigger="every 2s"` so HTMX self-polls. Once everything
+    has settled (extracted / low_confidence / failed) the fragment is
+    re-rendered WITHOUT a trigger and polling stops on the next swap.
+    """
+    account, _ = _resolve_account_for_request(request, account_id)
+    if account is None:
+        return HttpResponse(status=401)
     return render(
         request,
-        "portal/partials/upload_form.html",
-        {
-            "account": account,
-            "evidence_list": portal_services.list_evidence_for_account(account),
-            "success": "Uploaded — saved against this account.",
-        },
+        "portal/partials/evidence_list.html",
+        _panel_context(account),
     )
+
+
+def _panel_context(account) -> dict:
+    """Build the context the upload-form / evidence-list partials need.
+
+    Centralised so callers (challenge_panel, evidence_upload,
+    evidence_list_panel) emit consistent context — including the bill
+    recap and the `any_pending` flag that drives HTMX polling.
+    """
+    from vlm import services as vlm_services
+
+    evidence = portal_services.list_evidence_for_account(account)
+    return {
+        "account": account,
+        "bill": ingest_services.get_latest_bill(account),
+        "evidence_list": evidence,
+        "any_pending": vlm_services.has_pending_extraction_in(evidence),
+    }
 
 
 def _resolve_account_for_request(request: HttpRequest, account_id: int):

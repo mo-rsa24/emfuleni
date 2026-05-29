@@ -55,7 +55,7 @@ def record_evidence(
     _validate_extension(uploaded_file.name, rules["allowed_exts"])
     _validate_mime(uploaded_file.content_type, rules["allowed_mimes"])
 
-    return Evidence.objects.create(
+    evidence = Evidence.objects.create(
         municipality=ratepayer.municipality,
         ratepayer=ratepayer,
         municipal_account=account,
@@ -65,6 +65,37 @@ def record_evidence(
         content_type=(uploaded_file.content_type or "")[:80],
         size_bytes=uploaded_file.size,
     )
+
+    # Slice 6 auto-trigger: every photo enqueues a VLM extraction. CSV and
+    # PDF kinds skip this — Slice 7 will parse those when the engine needs them.
+    if kind == Evidence.KIND_PHOTO:
+        from vlm import services as vlm_services
+
+        vlm_services.enqueue_extraction(evidence)
+
+    return evidence
+
+
+def get_evidence_by_pk(pk) -> Evidence | None:
+    """Tenant-agnostic Evidence lookup by pk for in-process workers.
+
+    **WORKER-ONLY.** This is the only deliberately tenant-agnostic read
+    service in the project. Use it ONLY from background jobs that already
+    have a trusted pk and no caller-supplied tenant (e.g.
+    `vlm.tasks.run_extraction`). The returned Evidence carries
+    `municipality` itself, so downstream queries can scope from there.
+
+    DO NOT call this from view code or any code reachable from an HTTP
+    request — use `get_evidence(municipality, pk)` (tenant-scoped) instead.
+    Returns None on bad pk shape.
+    """
+    if pk in (None, ""):
+        return None
+    try:
+        pk_int = int(pk)
+    except (TypeError, ValueError):
+        return None
+    return Evidence.objects.filter(pk=pk_int).first()
 
 
 def get_evidence(municipality: Municipality, pk) -> Evidence | None:

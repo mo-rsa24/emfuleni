@@ -10,11 +10,37 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _load_dotenv(path: Path) -> None:
+    """Tiny stdlib .env loader — no python-dotenv dep needed.
+
+    Reads KEY=VALUE pairs from the file and copies them into os.environ
+    *without* overriding values already set in the shell. Strips matching
+    single or double quotes. Lines starting with # are comments.
+    """
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        value = value.strip()
+        if (value.startswith('"') and value.endswith('"')) or (
+            value.startswith("'") and value.endswith("'")
+        ):
+            value = value[1:-1]
+        os.environ.setdefault(key.strip(), value)
+
+
+_load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
@@ -148,6 +174,19 @@ MEDIA_URL = '/media/'
 # easier than loosening them later — start conservative.
 
 EVIDENCE_MAX_BYTES = 10 * 1024 * 1024  # 10 MiB
+
+# VLM (Slice 6) — meter-photo extraction via Anthropic
+# https://docs.anthropic.com/en/docs/about-claude/models
+# Design note Q3 picks Claude Sonnet 4.6 vision for the MVP. The model + the
+# call site (vlm.services.extract_meter_reading) are the only "swappable
+# interface" — swap to a different provider by replacing one function.
+
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+VLM_MODEL = 'claude-sonnet-4-6'
+VLM_MAX_OUTPUT_TOKENS = 1024
+VLM_MIN_CONFIDENCE = 0.50  # below this, mark extraction "low_confidence"
+VLM_TIMEOUT_SECONDS = 30
+
 
 EVIDENCE_KIND_RULES = {
     'photo': {

@@ -23,4 +23,9 @@ urlpatterns = [
         views.evidence_upload,
         name="evidence_upload",
     ),
+    path(
+        "account/<int:account_id>/evidence/list/",
+        views.evidence_list_panel,
+        name="evidence_list_panel",
+    ),
 ]
