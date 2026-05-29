@@ -11,7 +11,7 @@ import django_rq
 from common.models import Municipality
 
 from . import tasks
-from .models import MunicipalAccount
+from .models import MunicipalAccount, MunicipalBill
 
 
 def get_account(municipality: Municipality, account_number: str) -> MunicipalAccount | None:
@@ -23,6 +23,49 @@ def get_account(municipality: Municipality, account_number: str) -> MunicipalAcc
     return (
         MunicipalAccount.objects.for_tenant(municipality)
         .filter(account_number=account_number)
+        .first()
+    )
+
+
+def get_account_by_pk(municipality: Municipality, pk) -> MunicipalAccount | None:
+    """Return the `MunicipalAccount` for (tenant, pk), or None.
+
+    Used by views that have a numeric pk from a URL pattern. Non-integer
+    pks return None instead of raising.
+    """
+    if pk in (None, ""):
+        return None
+    try:
+        pk_int = int(pk)
+    except (TypeError, ValueError):
+        return None
+    return (
+        MunicipalAccount.objects.for_tenant(municipality)
+        .filter(pk=pk_int)
+        .first()
+    )
+
+
+def get_bill(account: MunicipalAccount, period) -> MunicipalBill | None:
+    """Return the `MunicipalBill` for (account, period), or None.
+
+    Period is a date with day=1 convention. Tenancy is enforced by the
+    account FK — bills are reached only through their account, which is
+    already tenant-scoped.
+    """
+    return (
+        MunicipalBill.objects.for_tenant(account.municipality)
+        .filter(municipal_account=account, period=period)
+        .first()
+    )
+
+
+def get_latest_bill(account: MunicipalAccount) -> MunicipalBill | None:
+    """Return the most recent `MunicipalBill` for this account, or None."""
+    return (
+        MunicipalBill.objects.for_tenant(account.municipality)
+        .filter(municipal_account=account)
+        .order_by("-period")
         .first()
     )
 

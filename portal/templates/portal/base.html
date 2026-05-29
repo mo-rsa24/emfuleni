@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block title %}Primeserve — {{ tenant.name }}{% endblock %}</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script>
+    // Send Django's CSRF token on every htmx-issued request.
+    document.addEventListener("htmx:configRequest", (e) => {
+      const tok = document.querySelector('meta[name="csrf-token"]');
+      if (tok) e.detail.headers["X-CSRFToken"] = tok.content;
+    });
+  </script>
+  <style>
+    :root {
+      --fg: #1a1a1a;
+      --muted: #666;
+      --line: #e4e4e7;
+      --bg: #fafafa;
+      --accent: #1d4ed8;
+      --warn: #b45309;
+    }
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 720px; margin: 0 auto; padding: 1.5rem; color: var(--fg); background: var(--bg); }
+    header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 0.75rem; margin-bottom: 1.5rem; }
+    header h1 { font-size: 1.125rem; margin: 0; }
+    header .meta { font-size: 0.875rem; color: var(--muted); }
+    main { display: flex; flex-direction: column; gap: 1.5rem; }
+    h2 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+    label { display: block; font-size: 0.875rem; color: var(--muted); margin-bottom: 0.25rem; }
+    input[type=text], input[type=tel] { width: 100%; padding: 0.5rem 0.75rem; font-size: 1rem; border: 1px solid var(--line); border-radius: 4px; box-sizing: border-box; }
+    button { padding: 0.5rem 1rem; font-size: 1rem; background: var(--accent); color: white; border: 0; border-radius: 4px; cursor: pointer; }
+    button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    .card { background: white; border: 1px solid var(--line); border-radius: 6px; padding: 1.25rem; }
+    .row { display: flex; justify-content: space-between; padding: 0.25rem 0; }
+    .row .label { color: var(--muted); }
+    .err { color: var(--warn); font-size: 0.875rem; margin-top: 0.5rem; }
+    .stub { color: var(--muted); font-style: italic; }
+    .stack > * + * { margin-top: 0.75rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Primeserve <span style="color: var(--muted); font-weight: normal;">— {{ tenant.name }}</span></h1>
+    <div class="meta">
+      {% if ratepayer %}
+        Signed in as {{ ratepayer.full_name }} ·
+        <a href="{% url 'portal:logout' %}">Sign out</a>
+      {% else %}
+        Not signed in
+      {% endif %}
+    </div>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

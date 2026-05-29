@@ -1,0 +1,16 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <section class="card stack">
+    <h2>Look up your account</h2>
+    <p>Enter your municipal account number. We will send a one-time code to your registered mobile number.</p>
+    <form method="post" action="{% url 'portal:lookup' %}" class="stack">
+      {% csrf_token %}
+      <div>
+        <label for="account_number">Account number</label>
+        <input type="text" id="account_number" name="account_number" value="{{ submitted_account_number|default:'' }}" autofocus required>
+      </div>
+      {% if error %}<p class="err">{{ error }}</p>{% endif %}
+      <button type="submit">Send code</button>
+    </form>
+  </section>
+{% endblock %}

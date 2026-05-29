@@ -1,0 +1,27 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <section class="card stack">
+    <h2>Account {{ account.account_number }}</h2>
+    <div class="row"><span class="label">Holder (per municipality)</span><span>{{ account.holder_name }}</span></div>
+    <div class="row"><span class="label">Service address</span><span>{{ account.service_address }}</span></div>
+    <div class="row"><span class="label">Class</span><span>{{ account.account_class }}</span></div>
+  </section>
+
+  {% if bill %}
+    <section class="card stack">
+      <h2>Current bill — {{ bill.period_label }}</h2>
+      <div class="row"><span class="label">Opening balance</span><span>R&nbsp;{{ bill.opening_balance }}</span></div>
+      <div class="row"><span class="label">Closing balance</span><span><strong>R&nbsp;{{ bill.closing_balance }}</strong></span></div>
+      {% if bill.charges.water_kl %}
+        <div class="row"><span class="label">Water (kℓ)</span><span>{{ bill.charges.water_kl }}</span></div>
+      {% endif %}
+      <div id="challenge-region">
+        {% include "portal/partials/challenge_button.html" %}
+      </div>
+    </section>
+  {% else %}
+    <section class="card">
+      <p class="stub">No bill on file for this account yet — the next municipal extract will populate it.</p>
+    </section>
+  {% endif %}
+{% endblock %}

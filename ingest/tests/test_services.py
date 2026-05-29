@@ -21,7 +21,13 @@ from ingest.models import (
     MunicipalBill,
     MunicipalLedgerEntry,
 )
-from ingest.services import enqueue_import_file, enqueue_poll, get_account
+from ingest.services import (
+    enqueue_import_file,
+    enqueue_poll,
+    get_account,
+    get_bill,
+    get_latest_bill,
+)
 
 
 CSV_HEADER = (
@@ -65,6 +71,25 @@ def _make_account(municipality, *, account_number, extract, holder_name="Holder 
         holder_name=holder_name,
         service_address="1 Test Street",
         account_class="residential",
+        source_extract=extract,
+    )
+
+
+def _make_bill(
+    municipality,
+    *,
+    account,
+    period,
+    extract,
+    opening_balance="1000.00",
+    closing_balance="1500.00",
+):
+    return MunicipalBill.objects.create(
+        municipality=municipality,
+        municipal_account=account,
+        period=period,
+        opening_balance=opening_balance,
+        closing_balance=closing_balance,
         source_extract=extract,
     )
 
@@ -375,3 +400,95 @@ class FileSystemInboxAdapterTests(TestCase):
             files = adapter.list_new_files(self.emfuleni)
 
         self.assertEqual(files, [])
+
+
+class GetBillTests(TestCase):
+    def setUp(self):
+        self.emfuleni = Municipality.objects.create(slug="emfuleni", name="Emfuleni")
+        self.extract = _make_extract(self.emfuleni, content_hash="c" * 64)
+        self.account = _make_account(
+            self.emfuleni,
+            account_number="88231104",
+            extract=self.extract,
+        )
+
+    def test_get_bill_returns_bill_for_known_period(self):
+        bill = _make_bill(
+            self.emfuleni,
+            account=self.account,
+            period=date(2026, 6, 1),
+            extract=self.extract,
+            closing_balance="2940.00",
+        )
+
+        result = get_bill(self.account, date(2026, 6, 1))
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.pk, bill.pk)
+        self.assertEqual(result.period, date(2026, 6, 1))
+
+    def test_get_bill_returns_none_for_unknown_period(self):
+        _make_bill(
+            self.emfuleni,
+            account=self.account,
+            period=date(2026, 6, 1),
+            extract=self.extract,
+        )
+
+        result = get_bill(self.account, date(2026, 7, 1))
+
+        self.assertIsNone(result)
+
+    def test_get_latest_bill_returns_most_recent(self):
+        _make_bill(
+            self.emfuleni,
+            account=self.account,
+            period=date(2026, 5, 1),
+            extract=self.extract,
+            closing_balance="1000.00",
+        )
+        june_bill = _make_bill(
+            self.emfuleni,
+            account=self.account,
+            period=date(2026, 6, 1),
+            extract=self.extract,
+            closing_balance="2000.00",
+        )
+
+        result = get_latest_bill(self.account)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.pk, june_bill.pk)
+        self.assertEqual(result.period, date(2026, 6, 1))
+
+    def test_get_latest_bill_returns_none_when_no_bills(self):
+        result = get_latest_bill(self.account)
+
+        self.assertIsNone(result)
+
+    def test_get_latest_bill_does_not_leak_other_accounts_bills(self):
+        account_b = _make_account(
+            self.emfuleni,
+            account_number="88231205",
+            extract=self.extract,
+        )
+        bill_a = _make_bill(
+            self.emfuleni,
+            account=self.account,
+            period=date(2026, 5, 1),
+            extract=self.extract,
+            closing_balance="500.00",
+        )
+        _make_bill(
+            self.emfuleni,
+            account=account_b,
+            period=date(2026, 6, 1),
+            extract=self.extract,
+            closing_balance="9000.00",
+        )
+
+        result = get_latest_bill(self.account)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.pk, bill_a.pk)
+        self.assertEqual(result.municipal_account_id, self.account.pk)

@@ -121,6 +121,20 @@ RQ_QUEUES = {
 INGEST_INBOX_DIR = BASE_DIR / 'dev_inbox'
 
 
+# Tenancy
+# MVP is Emfuleni-only; common.services.get_current_tenant() returns the
+# Municipality with this slug regardless of the request. Q7 swaps this for
+# subdomain or path-prefix resolution when a second tenant lands.
+
+DEFAULT_TENANT_SLUG = 'emfuleni'
+
+
+# Portal
+# Session key the portal uses to track the logged-in ratepayer.
+
+PORTAL_SESSION_KEY = 'portal:ratepayer_id'
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 

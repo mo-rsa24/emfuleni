@@ -8,6 +8,7 @@ apps read through `identity.services`.
 """
 
 from django.db import models
+from django.utils import timezone
 
 from common.models import TenantTimestamped
 
@@ -85,3 +86,43 @@ class RatepayerAccountLink(TenantTimestamped):
 
     def __str__(self):
         return f"{self.ratepayer.full_name} → {self.municipal_account.account_number}"
+
+
+class OtpCode(TenantTimestamped):
+    """A short-lived one-time code issued for ratepayer web auth (§6 Q5).
+
+    Stored as a row (not in Redis) for the audit trail — POPIA wants us
+    able to reconstruct who attempted login when. `consumed_at` is set on
+    successful verify; codes are single-use. Expiry is enforced in service
+    code, not DB — keeps the row available for later auditing even after
+    the code is no longer usable.
+
+    Production swap-out: the actual SMS delivery is stubbed by Slice 4
+    (the code is written to logs); real SMS lands in Slices 10/11
+    alongside the WhatsApp/USSD channels.
+    """
+
+    ratepayer = models.ForeignKey(
+        Ratepayer, on_delete=models.CASCADE, related_name="otp_codes"
+    )
+    code = models.CharField(max_length=8)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["municipality", "ratepayer", "-created_at"]),
+        ]
+
+    def is_consumed(self) -> bool:
+        return self.consumed_at is not None
+
+    def is_expired(self) -> bool:
+        return timezone.now() >= self.expires_at
+
+    def is_usable(self) -> bool:
+        return not self.is_consumed() and not self.is_expired()
+
+    def __str__(self):
+        state = "consumed" if self.is_consumed() else ("expired" if self.is_expired() else "live")
+        return f"OTP for {self.ratepayer.full_name} ({state})"

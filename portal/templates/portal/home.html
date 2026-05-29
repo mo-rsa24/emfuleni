@@ -1,0 +1,8 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <section class="card stack">
+    <h2>Welcome</h2>
+    <p>Look up a municipal account by number. We'll send a one-time code to the mobile number on file (or to the registered fallback contact) to confirm it's you.</p>
+    <p><a href="{% url 'portal:lookup' %}"><button>Start account lookup</button></a></p>
+  </section>
+{% endblock %}
