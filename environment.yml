@@ -5,6 +5,9 @@ dependencies:
   - python=3.11
   - pip:
     - Django==5.2.14
+    - django-rq==3.2.2
+    - rq==2.9.0
+    - redis==8.0.0
     - ruff==0.15.14
 
 prefix: "/home/molef/micromamba/envs/primeserve"

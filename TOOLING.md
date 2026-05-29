@@ -486,6 +486,42 @@ on exit. Backed up before edit; reversible by deleting the block.
 - Start manually each WSL session: `sudo service postgresql start`.
 - Will be replaced by a Dockerized Postgres when you add `docker-compose.yml`.
 
+### Redis (native on WSL2 — preferred for dev)
+
+Added in Slice 3 — RQ needs a broker. Two ways to get Redis listening on
+`127.0.0.1:6379`, which is where Django's `RQ_QUEUES['default']` points.
+
+**Native (recommended for dev).** WSL2 already has redis-server installed
+and autostarting via systemd. Verify:
+
+```bash
+redis-cli ping                                # PONG
+sudo systemctl status redis-server | head -3  # active (running)
+```
+
+That's it — no compose needed. Django/RQ talk to it directly.
+
+**Containerised (the `docker-compose.yml` option).** The compose file
+exists primarily as the *deploy reference* for Slice 13. Locally it
+conflicts with the native Redis on port 6379. To use it instead:
+
+```bash
+sudo systemctl stop redis-server     # free the port
+sudo systemctl disable redis-server  # optional — keep it stopped on reboot
+docker compose up -d redis
+```
+
+Settings:
+
+- `RQ_QUEUES['default']['HOST']` = `localhost`, port `6379`, no auth, no DB index.
+- In tests, `ASYNC: False` runs jobs inline so the suite needs no live Redis.
+
+Worker (either backend):
+
+```bash
+python manage.py rqworker default     # foreground worker, Ctrl+C to stop
+```
+
 ### Git
 
 - Repo initialized on `main`. `.gitignore` covers Python, Django, Docker,

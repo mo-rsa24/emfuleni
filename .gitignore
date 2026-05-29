@@ -26,6 +26,11 @@ db.sqlite3-journal
 # (compose files ARE committed; only local overrides are ignored)
 docker-compose.override.yml
 
+# --- Dev inbox (Slice 3 ingest) ---
+# Files dropped here by hand for testing are not source. The committed
+# sample lives in ingest/fixtures/ instead.
+/dev_inbox/
+
 # --- OS / editor ---
 .DS_Store
 Thumbs.db

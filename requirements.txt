@@ -1,6 +1,13 @@
 asgiref==3.11.1
+click==8.4.1
+croniter==6.2.2
 Django==5.2.14
+django-rq==3.2.2
 packaging==26.0
 psycopg2-binary==2.9.12
+python-dateutil==2.9.0.post0
+redis==8.0.0
+rq==2.9.0
 ruff==0.15.14
+six==1.17.0
 sqlparse==0.5.5

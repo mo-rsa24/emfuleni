@@ -12,8 +12,23 @@ from django.db import models
 class TenantManager(models.Manager):
     """Manager that scopes querysets to a single municipality.
 
-    Every domain model uses this. Bare .objects.filter() on a domain
-    model is a tenancy violation — always go through .for_tenant().
+    Every domain model uses this. The rule splits by direction:
+
+    - **Reads** — ALWAYS go through `.for_tenant(municipality)`. Bare
+      `.objects.filter(...)` / `.objects.get(...)` / `.objects.all()` on
+      a domain model is a tenancy violation.
+    - **Writes** — `.create()`, `.update_or_create()`, and `.get_or_create()`
+      may be called on `.objects` directly, AS LONG AS `municipality=` is
+      explicit in the call kwargs (or in `defaults` for the *_or_create
+      variants). This carve-out exists because Django's `QuerySet.create()`
+      does NOT propagate filter conditions from `for_tenant()` into the
+      new row — so `for_tenant(t).create(...)` would silently produce a
+      `municipality_id=NULL` IntegrityError. Writes are confined to the
+      app that owns the table (per the source-of-truth rule in CLAUDE.md),
+      which means the privileged writer always knows its tenant.
+
+    Tests follow the read rule for assertions and the write rule for
+    fixture construction.
     """
 
     def for_tenant(self, municipality):

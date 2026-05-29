@@ -1,0 +1,6 @@
+account_number,holder_name,service_address,account_class,period,opening_balance,closing_balance,water_kl,rates,refuse,payments_received,latest_meter_reading_kl,latest_meter_reading_date
+88231104,Mrs N Dlamini,"12 Marigold St, Sebokeng, Emfuleni",residential,2026-06,2410.00,2940.00,18,800,220,0,4127,2026-06-01
+88231205,Mr T Khumalo,"44 Vanderbijl Rd, Vanderbijlpark, Emfuleni",residential,2026-06,1880.00,2110.00,16,800,220,0,2283,2026-06-01
+88231306,ABC Spaza CC,"9 Market Ln, Sharpeville, Emfuleni",business,2026-06,6420.00,7180.00,150,2400,800,0,12540,2026-06-01
+88231411,Mr P Naidoo,"7 Acacia Rd, Vanderbijlpark, Emfuleni",residential,2026-06,1240.00,1490.00,11,800,220,0,3411,2026-06-01
+88231522,Mrs L van der Merwe,"22 Protea Ave, Vereeniging, Emfuleni",residential,2026-06,3120.00,3680.00,22,800,220,0,5022,2026-06-01

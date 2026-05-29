@@ -1,0 +1,25 @@
+# Dev infrastructure for the Emfuleni MVP.
+#
+# This file is primarily the DEPLOY reference (Slice 13 grows it to the
+# full stack: Postgres, Django, RQ worker, Nginx). For LOCAL dev:
+#
+#  - Postgres runs natively on WSL2 (see TOOLING.md "Native WSL2 PostgreSQL").
+#  - Redis ALSO runs natively on WSL2 by default — `redis-server.service`
+#    via systemd, on 127.0.0.1:6379. That's the same port the service
+#    below tries to bind, so `docker compose up redis` will fail with
+#    "ports are not available" UNTIL you stop the native one:
+#        sudo systemctl stop redis-server
+#    Native is the preferred dev backend — see TOOLING.md "Redis".
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: primeserve_redis_dev
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:

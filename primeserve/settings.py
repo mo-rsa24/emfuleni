@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -37,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_rq',
     'common',
     'identity',
     'ingest',
@@ -93,6 +95,30 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+
+
+# RQ (background tasks)
+# https://github.com/rq/django-rq
+
+# ASYNC=False executes jobs inline. Keyed to `python manage.py test` — if
+# the project ever moves to pytest, replace this toggle with a dedicated
+# test-settings module.
+_IS_TEST_RUN = 'test' in sys.argv
+
+RQ_QUEUES = {
+    'default': {
+        'HOST': 'localhost',
+        'PORT': 6379,
+        'DB': 0,
+        'DEFAULT_TIMEOUT': 360,
+        'ASYNC': not _IS_TEST_RUN,
+    },
+}
+
+
+# Ingest
+
+INGEST_INBOX_DIR = BASE_DIR / 'dev_inbox'
 
 
 # Password validation
